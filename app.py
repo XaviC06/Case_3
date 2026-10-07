@@ -20,7 +20,7 @@ import statsmodels.api as sm
 import streamlit as st
 from plotly.subplots import make_subplots
 
-from data_loader import (DELAY_LIMIT, EXTREME_LIMIT, HOME_ICAO, WEEKDAYS, haversine_km, load_airports,
+from data_loader import (data_file, DELAY_LIMIT, EXTREME_LIMIT, HOME_ICAO, WEEKDAYS, haversine_km, load_airports,
                          load_schedule, load_tracks, load_weather, nearest_airport)
 
 st.set_page_config(page_title="Zürich Airport 2019-2020", page_icon="✈️", layout="wide")
@@ -704,7 +704,7 @@ def tab_vluchten():
 # =========================================================================== TAB 7 - DATA & OPSCHONING
 @st.cache_data
 def raw_missing():
-    raw = pd.read_csv("data/schedule_airport.csv.gz", dtype=str, keep_default_na=False)
+    raw = pd.read_csv(data_file("schedule_airport.csv.gz"), dtype=str, keep_default_na=False)
     rows = []
     for c in raw.columns:
         rows.append({"Kolom": c, "Leeg": int((raw[c] == "").sum()), "'#N/A'": int((raw[c] == "#N/A").sum()),

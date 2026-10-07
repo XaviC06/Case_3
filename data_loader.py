@@ -12,7 +12,26 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 
-DATA = Path(__file__).parent / "data"
+ROOT = Path(__file__).parent
+DATA = ROOT / "data"
+
+
+def data_file(name: str) -> Path:
+    """Zoek een databestand in data/, naast app.py of in een willekeurige submap (robuust tegen een andere mapindeling op GitHub)."""
+    for cand in (DATA / name, ROOT / name):
+        if cand.exists():
+            return cand
+    hits = sorted(ROOT.rglob(name))
+    if hits:
+        return hits[0]
+    # ook bestanden die door de browser zijn hernoemd, bv. 'schedule_airport (1).csv.gz'
+    stem = name.split(".")[0]
+    hits = sorted(p for p in ROOT.rglob(stem + "*") if p.is_file())
+    if hits:
+        return hits[0]
+    present = sorted(str(p.relative_to(ROOT)) for p in ROOT.rglob("*") if p.is_file() and ".git" not in p.parts)
+    raise FileNotFoundError(f"Databestand '{name}' niet gevonden. Verwacht in map 'data/' naast app.py. "
+                            f"Bestanden in de repo: {present}")
 HOME_ICAO = "LSZH"                      # Zürich Airport (afgeleid uit de data: baanconcepten 'Bise', runways 14/16/28/32/34)
 DELAY_LIMIT = 15                        # 'te laat' = >= 15 min na geplande tijd (gangbare A15-definitie in de luchtvaart)
 EXTREME_LIMIT = 180                     # |vertraging| > 3 uur markeren we als 'extreem' (we verwijderen ze NIET)
@@ -50,7 +69,7 @@ def _log(log, stap, probleem, n, ingreep, rows_after, motivatie):
 # --------------------------------------------------------------------------- luchthavens (OpenFlights)
 @st.cache_data
 def load_airports() -> pd.DataFrame:
-    return pd.read_csv(DATA / "airports.csv.gz")
+    return pd.read_csv(data_file("airports.csv.gz"))
 
 
 # --------------------------------------------------------------------------- weer
@@ -59,7 +78,7 @@ def load_weather():
     """Meteostat-dagwaarden station 06670 (Zürich-Kloten). Kolomnamen volgens het Meteostat-formaat."""
     log = []
     cols = ["date", "tavg", "tmin", "tmax", "prcp", "snow", "wdir", "wspd", "wpgt", "pres", "tsun"]
-    w = pd.read_csv(DATA / "weather_06670.csv.gz", header=None, names=cols, parse_dates=["date"])
+    w = pd.read_csv(data_file("weather_06670.csv.gz"), header=None, names=cols, parse_dates=["date"])
     n0 = len(w)
     _log(log, "W1", "Bestand bevat 1973-2026, de vluchtdata alleen 2019-2020", n0 - 731,
          "Alleen 2019-2020 behouden", 731,
@@ -83,7 +102,7 @@ def load_weather():
 @st.cache_data(show_spinner="Vluchtdata laden en opschonen…")
 def load_schedule():
     log = []
-    raw = pd.read_csv(DATA / "schedule_airport.csv.gz", dtype=str, keep_default_na=False)
+    raw = pd.read_csv(data_file("schedule_airport.csv.gz"), dtype=str, keep_default_na=False)
     raw = raw.mask(raw.isin(["", "#N/A"]))   # Excel-fout '#N/A' en lege cellen = ontbrekend
     df = raw.copy()
     n0 = len(df)
@@ -186,7 +205,7 @@ def load_schedule():
 @st.cache_data
 def load_tracks():
     log = []
-    f = pd.read_csv(DATA / "flights_30s_raw.csv.gz", dtype=str)
+    f = pd.read_csv(data_file("flights_30s_raw.csv.gz"), dtype=str)
     n0 = len(f)
     star = int(f.tas_kt.str.contains(r"\*", na=False).sum())
     f["tas_kt"] = f.tas_kt.str.replace("*", "", regex=False)
